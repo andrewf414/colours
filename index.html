@@ -1,0 +1,326 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="X-UA-Compatible" content="IE=10">
+	<meta charset="utf-8">
+	<meta name="GENERATOR" content="Microsoft SharePoint">
+	<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+	<meta http-equiv="Expires" content="0">
+
+	<!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+	<title>Colours</title>
+	
+	<style>
+		.palette, .shades {
+			height: 35px;
+			cursor: pointer;
+		}
+		
+		.palette-container {
+			padding: 40px;
+		}
+		
+	</style>
+</head>
+
+<body>
+	<div class="text-center row">
+		
+		<div class="col-md-6 palette-container">
+			<h5>Background Colour for palette</h5>
+			<input class="col-md-6 col-md-offset-3" type="text" id="paletteOneBgInput" placeholder="enter 6 digit hex value" />
+			<br>
+			<h4>Palette 1</h4>
+			<input class="col-md-6 col-md-offset-3" type="text" id="paletteOneInput" placeholder="enter 6 digit hex value" />
+			<div class="col-md-6 col-md-offset-3" id="paletteOne"></div>
+		</div>
+		
+		<div class="col-md-6 palette-container">
+			<h5>Background Colour for palette</h5>
+			<input class="col-md-6 col-md-offset-3" type="text" id="paletteTwoBgInput" placeholder="enter 6 digit hex value" />
+			<br>
+			<h4>Palette 2</h4>
+			<input class="col-md-6 col-md-offset-3" type="text" id="paletteTwoInput" placeholder="enter 6 digit hex value" />
+			<div class="col-md-6 col-md-offset-3" id="paletteTwo"></div>
+		</div>
+		
+	</div>
+	
+	<br>
+	<div class="row">
+		<div class="col-md-4 col-md-offset-4">
+			<button class="btn btn-default" id="clrBtn">Clear all</button>
+			<br>
+			<p>Type in hex vals with or without #. To copy a value to clipboard, just click on the colour rectangle.</p>
+		</div>
+	</div>
+	
+	
+	<script>
+		/*
+			Set up the listeners for each input and palette div
+		*/
+		const pal1 = document.querySelector('#paletteOneInput');
+		const pal2 = document.querySelector('#paletteTwoInput');
+		const inputs = [pal1,pal2];
+		document.querySelector('#paletteOneInput').addEventListener('input', setColours, false);				// add event listener for change of input
+		document.querySelector('#paletteTwoInput').addEventListener('input', setColours, false);				// add event listener for change of input
+		// TODO: make a function for the listeners
+		document.querySelector('#paletteOneBgInput').addEventListener('input', function () {
+			let c = this.value;
+			this.parentElement.style.backgroundColor = '#' + c;
+		});
+		document.querySelector('#paletteTwoBgInput').addEventListener('input', function () {
+			let c = this.value;
+			this.parentElement.style.backgroundColor = '#' + c;
+		});
+
+		
+		/*
+			Called to copy hex val to clipboard
+		*/
+		function copyHexVal () {
+			var range = document.createRange();
+			range.selectNodeContents(this);
+			var selection = window.getSelection();
+			selection.removeAllRanges();
+			selection.addRange(range);
+			try {
+				var successful = document.execCommand('copy');
+			} 
+			catch (err) {
+				console.log('Oops, unable to copy');
+				console.log(err);
+			}
+		}
+		
+		
+		
+		/*
+			Called on input change to set the colour of palette div
+		*/
+		function setColours () {
+			// Set the input fields colour
+			for (var i = 0; i < inputs.length; i++) {
+				let hexVal = inputs[i].value;
+				if ( hexVal === "") { 												// if empty, make it white
+					hexVal = "fff";
+				} else if ( hexVal.charAt( 0 ) === '#' ) { 							// allow hex vals with or without #
+					hexVal.shift();
+				}
+			
+				if (hexVal.length === 6 || hexVal === 'fff') {
+					inputs[i].style.backgroundColor = '#' + hexVal;
+					let pieces = get_luminance_values(hexVal);
+					if (pieces.lum[0] < 0.5) { inputs[i].style.color = "#fff"; }
+				
+					// Create the list of palette options
+					let obj = inputs[i].nextElementSibling;
+					produce_shades(obj, hexVal);									// this makes the variations of 0.05 lighter and darker
+				}
+			}
+		}
+		
+		
+		/*
+			Creating the shades
+		*/
+		function produce_shades(obj, hexVal) {
+			while (obj.hasChildNodes()) {											// empty out existing table values
+				obj.removeChild(obj.lastChild);
+			}
+
+			const pieces = get_luminance_values(hexVal);							// Get the base colour we are going from and make its variations
+			const lums = pieces.lum;
+			
+			// Make the list of all the colours of various brightness
+			for (var i=0; i < lums.length; i++) {
+				let row = create_div_node(pieces.hsl, lums[i]);						// make nodes to append to table
+				obj.appendChild(row);
+			}
+			
+			// gets the shades and set up listener for copy to clipboard
+			// TODO: this should probably be a listener on the container and bubble the element
+			var shadeDivs = document.getElementsByClassName("shades");
+			for (var i = 0; i < shadeDivs.length; i++) {
+				shadeDivs[i].addEventListener('click', copyHexVal, false);
+			}
+		}
+		
+		
+		
+		
+		/*
+			Creates a row node to go into the shades table.
+		*/
+		function create_div_node(hsl, lum) {
+			let colourDiv = document.createElement("DIV");
+			let rgb = hslToRgb(hsl[0], hsl[1], lum);
+			
+			if(!isNaN(rgb[0])) {
+				let hex = rgbToHex(rgb[0], rgb[1], rgb[2]);
+				colourDiv.setAttribute("class", "shades row");						// apply class to div
+				colourDiv.style.backgroundColor = hex;								// set div background colour
+				if (lum < 0.5) {
+					colourDiv.style.color = "#fff";									// set div background colour
+				}
+				if(lum == hsl[2]) { colourDiv.setAttribute("font-weight", "bold"); }// if it is the base colour put it in bold
+				var t = document.createTextNode(hex);
+				colourDiv.appendChild(t);
+			}
+			return colourDiv;
+		}
+		
+		
+		
+		/*
+			Clear all button
+		*/
+		var btn = document.getElementById("clrBtn");
+		btn.addEventListener('click', function() {
+			for (var i = 0; i < inputs.length; i++) {
+				inputs[i].value = "";													// clear vals and make colour white
+			}
+			
+			// TODO: this can surely be better
+			document.querySelector("#paletteOne").innerHTML = "";
+			document.querySelector("#paletteTwo").innerHTML = "";
+			document.querySelector("#paletteOneBgInput").value = "";
+			document.querySelector("#paletteOneBgInput").parentElement.style.backgroundColor = '#fff';
+			document.querySelector("#paletteOneInput").style.color = '#000';
+			document.querySelector("#paletteOneInput").style.backgroundColor = '#fff';
+			document.querySelector("#paletteTwoBgInput").value = "";
+			document.querySelector("#paletteTwoBgInput").parentElement.style.backgroundColor = '#fff';
+			document.querySelector("#paletteTwoInput").style.color = '#000';
+			document.querySelector("#paletteTwoInput").style.backgroundColor = '#fff';
+		});
+		
+		
+		/*
+			Creates the arrays of luminance and returns that 
+			along with original value hsl representation
+		*/
+		function get_luminance_values(hexVal) {
+			hexVal = (hexVal+'').replace(/#/, '');					// remove # if present
+			var rgb = [];
+			for (var i = 0; i < 6; i+=2) {							// get array of rgb values of the hex value
+				rgb.push(parseInt(hexVal.substr(i,2),16));
+			}
+			var hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);				// convert the rgb values into hsl values
+			
+			var lum = hsl[2];										// get out luminance value of hsl
+			var lums = [lum];										// make array of luminance going up and down in 0.05 increments
+			while (lum > 0.05) {
+				lum -= 0.05;
+				lums.push(lum);
+			}
+			
+			lum = hsl[2];
+			while (lum < 0.95) {
+				lum += 0.05;
+				lums.push(lum);
+			}
+			lums.sort(function (a,b) { return a - b; });											// sort the array of luminances			
+			
+			// TODO: sort having white and black at the extremes
+			if (lums[0] != 0) {
+				lums.unshift(0);
+			}
+			if (lums[lums.length-1] != 1) {
+				lums.push(1);
+			}
+			
+			var pieces = {
+				lum: lums,
+				hsl: hsl
+			};
+			return pieces;
+		}
+		
+		
+		
+		
+				
+		/**
+		 * Converts an HSL color value to RGB. Conversion formula
+		 * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+		 * Assumes h, s, and l are contained in the set [0, 1] and
+		 * returns r, g, and b in the set [0, 255].
+		 *
+		 * @param   {number}  h       The hue
+		 * @param   {number}  s       The saturation
+		 * @param   {number}  l       The lightness
+		 * @return  {Array}           The RGB representation
+		 */
+		function hslToRgb(h, s, l){
+			var r, g, b;
+
+			if(s == 0){
+				r = g = b = l; // achromatic
+			}else{
+				var hue2rgb = function hue2rgb(p, q, t){
+					if(t < 0) t += 1;
+					if(t > 1) t -= 1;
+					if(t < 1/6) return p + (q - p) * 6 * t;
+					if(t < 1/2) return q;
+					if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+					return p;
+				}
+
+				var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+				var p = 2 * l - q;
+				r = hue2rgb(p, q, h + 1/3);
+				g = hue2rgb(p, q, h);
+				b = hue2rgb(p, q, h - 1/3);
+			}
+
+			return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+		}
+		
+		/**
+		 * Converts an RGB color value to HSL. Conversion formula
+		 * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+		 * Assumes r, g, and b are contained in the set [0, 255] and
+		 * returns h, s, and l in the set [0, 1].
+		 *
+		 * @param   {number}  r       The red color value
+		 * @param   {number}  g       The green color value
+		 * @param   {number}  b       The blue color value
+		 * @return  {Array}           The HSL representation
+		 */
+		function rgbToHsl(r, g, b){
+			r /= 255, g /= 255, b /= 255;
+			var max = Math.max(r, g, b), min = Math.min(r, g, b);
+			var h, s, l = (max + min) / 2;
+
+			if(max == min){
+				h = s = 0; // achromatic
+			}else{
+				var d = max - min;
+				s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+				switch(max){
+					case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+					case g: h = (b - r) / d + 2; break;
+					case b: h = (r - g) / d + 4; break;
+				}
+				h /= 6;
+			}
+
+			return [h, s, l];
+		}
+		
+		
+		function componentToHex(c) {
+			var hex = c.toString(16);
+			return hex.length == 1 ? "0" + hex : hex;
+		}
+
+		function rgbToHex(r, g, b) {
+			return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+		}
+	</script>
+</body>
+</html> 
